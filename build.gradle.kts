@@ -15,6 +15,7 @@ repositories {
 dependencies {
     implementation(kotlin("stdlib-jdk8"))
     implementation("no.tornado:tornadofx:1.7.17")
+    api("scientifik:kmath-core-jvm:0.1.0-dev")
 }
 
 tasks.withType<KotlinCompile> {
