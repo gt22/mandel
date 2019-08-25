@@ -2,12 +2,14 @@ package mandel
 
 import javafx.animation.AnimationTimer
 import javafx.scene.canvas.Canvas
-import javafx.scene.input.MouseButton
 import javafx.scene.input.MouseButton.PRIMARY
 import javafx.scene.input.MouseButton.SECONDARY
 import javafx.scene.paint.Color
 import mandel.Styles.Companion.rootClass
 import tornadofx.*
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.sqrt
 
 fun main() = launch<Appl>()
 
@@ -17,24 +19,23 @@ class Appl : App(MainView::class, Styles::class)
 class MainView : View() {
 
     val zoomPerSec = 0.5
-    val mLeft = -2.5
-    val mRight = 1.5
-    val mBot = -1.5
-    val mTop = 1.5
+    private val mLeft = -2.5
+    private val mRight = 1.5
+    private val mBot = -1.5
+    private val mTop = 1.5
     val dynamicIter = 100
-    val staticIter = 250
+    val staticIter = 500
     var curIter = staticIter
     val alwaysStaticIterWidth = 0.0005
-    val colorFactor
-        get() = 1000 / curIter
+    private val colorFactor = 1000 / staticIter
 
 
     var cLeft = mLeft
     var cRight = mRight
-    var cBot = mBot
-    var cTop = mTop
+    private var cBot = mBot
+    private var cTop = mTop
 
-    lateinit var c: Canvas
+    private lateinit var c: Canvas
 
     var zoomX = -1.0
     var zoomY = -1.0
@@ -71,17 +72,13 @@ class MainView : View() {
             zoomX = it.sceneX
             zoomY = it.sceneY
         }
-//        setOnMouseClicked {
-//            zoomIn(it.sceneX, it.sceneY, 0.1)
-//            zoomOut(it.sceneX, it.sceneY, 0.1)
-//        }
     }
 
-    fun renorm(i: Double, sl: Double, sr: Double, tl: Double, tr: Double) =
+    private fun renorm(i: Double, sl: Double, sr: Double, tl: Double, tr: Double) =
         (((i - sl) / sr) * (tr - tl)) + tl
 
 
-    fun toMandelCoords(x: Double, y: Double): Pair<Double, Double> {
+    private fun toMandelCoords(x: Double, y: Double): Pair<Double, Double> {
         return renorm(x, 0.0, c.width, cLeft, cRight) to
                 renorm(y, 0.0, c.height, cBot, cTop)
     }
@@ -112,23 +109,36 @@ class MainView : View() {
 
     fun zoomIn(x: Double, y: Double, z: Double) {
         val (mx, my) = toMandelCoords(x, y)
-        val z1 = 1 - z
-        val ox = mx * z
-        val oy = my * z
-        cLeft = cLeft * z1 + ox
-        cRight = cRight * z1 + ox
-        cBot = cBot * z1 + oy
-        cTop = cTop * z1 + oy
+        cLeft -= (cLeft - mx) * z
+        cRight -= (cRight - mx) * z
+        cBot -= (cBot - my) * z
+        cTop -= (cTop - my) * z
     }
 
-    fun checkPoint(a: Double, b: Double): Int {
+    private fun cardioidCheck(a: Double, b: Double): Boolean {
+        val xh = a - 0.25
+        val rho = sqrt(xh * xh + b * b)
+        val theta = atan2(b, a - 0.25)
+        val rhoC = (1 - cos(theta)) / 2
+        return rho <= rhoC
+    }
 
-        var i = 0
-        val c = a + b.j
-        var z = 0.j
+    private fun checkPoint(a: Double, b: Double): Int {
+        if (a * a + b * b > 4) {
+            return 0
+        }
+        if (cardioidCheck(a, b)) {
+            return curIter
+        }
+        var i = 1
+
+        var re = a
+        var im = b
         while (i < curIter) {
-            z = z.tSquare + c
-            if (z.normSquare > 4) {
+            val oRe = re
+            re = re * re - im * im + a
+            im = 2 * oRe * im + b
+            if (re * re + im * im > 4) {
                 return i
             }
             i++
@@ -173,9 +183,9 @@ class MainView : View() {
 
 }
 
-class ZoomTimer(val v: MainView) : AnimationTimer() {
+class ZoomTimer(private val v: MainView) : AnimationTimer() {
     
-    var prev = System.nanoTime()
+    private var prev = System.nanoTime()
     
     override fun handle(now: Long) {
         val dt = (now.toDouble() - prev) / (1000 * 1000 * 1000)
