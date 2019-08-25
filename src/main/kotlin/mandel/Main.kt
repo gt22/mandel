@@ -7,6 +7,7 @@ import javafx.scene.input.MouseButton.SECONDARY
 import javafx.scene.paint.Color
 import mandel.Styles.Companion.rootClass
 import tornadofx.*
+import java.util.stream.IntStream
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sqrt
@@ -23,12 +24,15 @@ class MainView : View() {
     private val mRight = 1.5
     private val mBot = -1.5
     private val mTop = 1.5
-    val dynamicIter = 100
-    val staticIter = 500
+    val dynamicIter = 200
+    val staticIter = 1000
     var curIter = staticIter
     val alwaysStaticIterWidth = 0.0005
     private val colorFactor = 1000 / staticIter
-
+    private val colors = Array(staticIter) { i ->
+        val c = i * colorFactor
+        Color.rgb((c * c) % 255, c % 255, c % 255)
+    }
 
     var cLeft = mLeft
     var cRight = mRight
@@ -130,17 +134,21 @@ class MainView : View() {
         if (cardioidCheck(a, b)) {
             return curIter
         }
+
         var i = 1
 
         var re = a
         var im = b
         while (i < curIter) {
-            val oRe = re
-            re = re * re - im * im + a
-            im = 2 * oRe * im + b
-            if (re * re + im * im > 4) {
+            val rsq = re * re
+            val isq = im * im
+            if (rsq + isq > 4) {
                 return i
             }
+            im *= re //im = im * re
+            im += im + b // im = 2 * im * re + b
+            re = rsq - isq + a
+
             i++
         }
         return i
@@ -148,29 +156,23 @@ class MainView : View() {
 
     fun draw() {
         with(c.graphicsContext2D.pixelWriter) {
-            val w = c.width.toInt() - 1
-            val h = c.height.toInt() - 1
-            val hist = Array(curIter + 1) { 0 }
-            val iters = Array(w + 1) { Array(h + 1) { curIter } }
-            var total = 0
-            val wd = w.toDouble()
-            val hd = h.toDouble()
-            for (i in 0..w) {
-
-                val a = renorm(i.toDouble(), 0.0, wd, cLeft, cRight)
-                for (j in 0..h) {
-                    val b = renorm(j.toDouble(), 0.0, hd, cBot, cTop)
+            val w = c.width.toInt()
+            val h = c.height.toInt()
+            val iter = Array(w) { Array(h) { 0 } }
+            IntStream.range(0, w).parallel()
+                .mapToObj(Integer::valueOf)
+                .flatMap { i -> IntStream.range(0, h).mapToObj {j -> i to j} }
+                .forEach {
+                    val (i, j) = it
+                    val (a, b) = toMandelCoords(i.toDouble(), j.toDouble())
                     val mandel = checkPoint(a, b)
-                    iters[i][j] = mandel
-                    hist[mandel]++
-                    total++
-                    if (mandel == curIter) {
-                        setColor(i, j, Color.BLACK)
-                    } else {
-                        val c = mandel * colorFactor
-                        setColor(i, j, Color.rgb((c * c) % 255, c % 255, c % 255))
-                    }
-
+                    iter[i][j] = mandel
+                }
+            for (i in 0 until w) {
+                for (j in 0 until h) {
+                    val mandel = iter[i][j]
+                    val c = if (mandel == curIter) Color.BLACK else colors[mandel]
+                    setColor(i, j, c)
                 }
             }
         }
