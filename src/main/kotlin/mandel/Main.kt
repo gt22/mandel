@@ -1,12 +1,18 @@
 package mandel
 
 import javafx.animation.AnimationTimer
+import javafx.scene.SnapshotParameters
 import javafx.scene.canvas.Canvas
+import javafx.scene.image.WritableImage
+import javafx.scene.input.Clipboard
+import javafx.scene.input.KeyCode
 import javafx.scene.input.MouseButton.PRIMARY
 import javafx.scene.input.MouseButton.SECONDARY
 import javafx.scene.paint.Color
+import javafx.stage.Stage
 import mandel.Styles.Companion.rootClass
 import tornadofx.*
+import java.awt.image.BufferedImage
 import java.util.stream.IntStream
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -15,7 +21,14 @@ import kotlin.math.sqrt
 fun main() = launch<Appl>()
 
 
-class Appl : App(MainView::class, Styles::class)
+class Appl : App(MainView::class, Styles::class) {
+
+    override fun start(stage: Stage) {
+        super.start(stage)
+        stage.scene.root.requestFocus()
+    }
+
+}
 
 class MainView : View() {
 
@@ -75,6 +88,11 @@ class MainView : View() {
         setOnMouseDragged {
             zoomX = it.sceneX
             zoomY = it.sceneY
+        }
+        setOnKeyPressed {
+            if (it.code == KeyCode.SPACE) {
+                saveImage()
+            }
         }
     }
 
@@ -181,6 +199,12 @@ class MainView : View() {
     init {
         draw()
         ZoomTimer(this).start()
+    }
+
+    private fun saveImage() {
+        val img = WritableImage(c.width.toInt(), c.height.toInt())
+        c.snapshot(SnapshotParameters(), img)
+        Clipboard.getSystemClipboard().setContent { putImage(img) }
     }
 
 }
